@@ -12,3 +12,8 @@ news.db
 memory.md
 .memory-state
 .memory-pending
+
+# Журналы проверок и бота
+health.log
+bot.log
+.health-state

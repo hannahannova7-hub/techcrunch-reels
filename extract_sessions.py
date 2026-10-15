@@ -15,8 +15,8 @@ HERE = Path(__file__).parent
 STATE = HERE / ".memory-state"
 PENDING = HERE / ".memory-pending"
 PROJECTS = Path.home() / ".claude" / "projects"
-# Реплики самого задания по обновлению памяти в память не попадают.
-TASK_MARKER = "MEMORY-UPDATE-TASK"
+# Сессии служебных заданий (обновление памяти, проверка здоровья) в память не попадают.
+TASK_MARKERS = ("MEMORY-UPDATE-TASK", "HEALTH-CHECK-TASK")
 MAX_CHARS = 800
 
 
@@ -42,7 +42,7 @@ def session_lines(path, since):
         if entry.get("type") not in ("user", "assistant") or "timestamp" not in entry:
             continue
         text = text_of(entry.get("message", {})).strip()
-        if TASK_MARKER in text:
+        if any(marker in text for marker in TASK_MARKERS):
             return []
         if text and parse_time(entry["timestamp"]) > since:
             stamp = parse_time(entry["timestamp"]).astimezone().strftime("%Y-%m-%d %H:%M")
