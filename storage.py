@@ -21,7 +21,42 @@ def connect():
             times_sent INTEGER NOT NULL DEFAULT 1
         )"""
     )
+    db.execute(
+        """CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            received_at TEXT NOT NULL,
+            status TEXT NOT NULL,
+            result TEXT
+        )"""
+    )
     return db
+
+
+# Статусы задачи: waiting — ждёт подтверждения (пришла, пока бот был выключен),
+# queued — в очереди, done — выполнена, failed — ошибка, skipped — отменена.
+def add_task(chat_id, text, received_at, status):
+    with connect() as db:
+        cursor = db.execute(
+            "INSERT INTO tasks (chat_id, text, received_at, status) VALUES (?, ?, ?, ?)",
+            (chat_id, text, received_at, status),
+        )
+        return cursor.lastrowid
+
+
+def set_task(task_id, status, result=None):
+    with connect() as db:
+        db.execute("UPDATE tasks SET status = ?, result = COALESCE(?, result) WHERE id = ?",
+                   (status, result, task_id))
+
+
+def tasks_with_status(status):
+    with connect() as db:
+        return db.execute(
+            "SELECT id, chat_id, text, received_at FROM tasks WHERE status = ? ORDER BY id",
+            (status,),
+        ).fetchall()
 
 
 def remember(items):
