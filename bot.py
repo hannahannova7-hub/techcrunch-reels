@@ -11,6 +11,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+import storage
 from fetch_news import load_items, pick
 
 MAX_NEWS = 7
@@ -18,6 +19,7 @@ HELP_TEXT = (
     "Привет! Я присылаю свежие новости TechCrunch про ИИ, стартапы, финтех и технологии — "
     "материал для коротких роликов.\n\n"
     "/news — свежие новости за последние сутки\n"
+    "/history — какие новости я уже присылал (хранятся в базе)\n"
     "/start — это сообщение"
 )
 
@@ -49,12 +51,30 @@ def news_message():
     if not chosen:
         return "За последние трое суток подходящих новостей на TechCrunch нет."
 
+    chosen = chosen[:MAX_NEWS]
+    new_links = storage.remember(chosen)
+
     lines = [f"<b>Свежее на TechCrunch за {hours} ч</b>", ""]
-    for item in chosen[:MAX_NEWS]:
+    for item in chosen:
         date = item["published"].astimezone().strftime("%d.%m %H:%M")
         title = html.escape(item["title"])
-        lines.append(f'• <a href="{item["link"]}">{title}</a> — {date}')
-    lines += ["", "Дату самого события проверяйте отдельно перед съёмкой."]
+        mark = "🆕" if item["link"] in new_links else "↩️"
+        lines.append(f'{mark} <a href="{item["link"]}">{title}</a> — {date}')
+    lines += [
+        "",
+        f"🆕 новых: {len(new_links)}, ↩️ уже присылал: {len(chosen) - len(new_links)}",
+        "Дату самого события проверяйте отдельно перед съёмкой.",
+    ]
+    return "\n".join(lines)
+
+
+def history_message():
+    total, rows = storage.history()
+    if not total:
+        return "В базе пока пусто. Напишите /news, и я начну запоминать новости."
+    lines = [f"<b>В базе {total} новостей.</b> Последние:", ""]
+    for title, link, sent_at in rows:
+        lines.append(f'• <a href="{link}">{html.escape(title)}</a> — впервые прислал {sent_at}')
     return "\n".join(lines)
 
 
@@ -73,6 +93,8 @@ def handle(message):
         except Exception as error:
             reply(chat_id, "Не получилось загрузить новости TechCrunch, попробуйте чуть позже.")
             print("Ошибка при сборе новостей:", error)
+    elif text.startswith("/history"):
+        reply(chat_id, history_message())
     else:
         reply(chat_id, HELP_TEXT)
 
@@ -80,6 +102,7 @@ def handle(message):
 def main():
     call("setMyCommands", commands=json.dumps([
         {"command": "news", "description": "Свежие новости TechCrunch"},
+        {"command": "history", "description": "Какие новости уже присылал"},
         {"command": "start", "description": "Что умеет бот"},
     ]))
     me = call("getMe")
